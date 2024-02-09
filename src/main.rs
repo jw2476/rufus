@@ -1,6 +1,6 @@
 mod asm;
 
-use std::io::Write;
+use std::{io::Write, time::Instant};
 
 use asm::assemble;
 use bitint::prelude::*;
@@ -10,6 +10,8 @@ use num_traits::{FromPrimitive, ToBytes, ToPrimitive};
 
 pub type Address = u16;
 pub const PC: Address = 0x0;
+pub const WRITING: Address = 0xFFFE;
+pub const DATA: Address = 0xFFFF;
 
 #[derive(FromPrimitive, ToPrimitive)]
 pub enum Opcodes {
@@ -323,6 +325,8 @@ impl Machine {
     }
 
     pub fn run(mut self) -> Self {
+        let mut start = Instant::now();
+        let mut i = 0;
         loop {
             let pc: Address = self.read(PC) as u16;
 
@@ -398,11 +402,23 @@ impl Machine {
                         self.write(inst.to as Address, self.read(inst.from as Address));
                     }
                 }
-                _ => panic!("Inknown opcode {opcode}"),
+            }
+
+            if self.read(WRITING) != 0 {
+                print!("{}", self.read(DATA) as u8 as char);
+                std::io::stdout().flush().unwrap();
+                self.write(WRITING, 0);
             }
 
             if pc == self.read(PC) as u16 {
                 self.write(PC, pc as u32 + length as u32);
+            }
+
+            i += 1;
+            if i == 100_000_000 {
+                println!("{}MHz", 100. / (Instant::now() - start).as_secs_f64());
+                start = Instant::now();
+                i = 0;
             }
         }
     }
